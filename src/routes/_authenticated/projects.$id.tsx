@@ -294,8 +294,8 @@ function ProjectPage() {
             <div className="rounded-2xl border border-border bg-surface p-6">
               <div className="mb-3 flex items-center gap-2 text-primary"><Sparkles className="h-4 w-4" /><span className="text-sm font-medium">AI brief analysis</span></div>
               <p className="text-sm">{briefQ.data.summary}</p>
-              {briefQ.data.risks?.length > 0 && (<div className="mt-4"><div className="text-xs uppercase tracking-widest text-muted-foreground">Risks</div><ul className="mt-1 list-disc pl-5 text-sm">{briefQ.data.risks.map((r: string, i: number) => <li key={i}>{r}</li>)}</ul></div>)}
-              {briefQ.data.questions?.length > 0 && (<div className="mt-4"><div className="text-xs uppercase tracking-widest text-muted-foreground">Questions</div><ul className="mt-1 list-disc pl-5 text-sm">{briefQ.data.questions.map((r: string, i: number) => <li key={i}>{r}</li>)}</ul></div>)}
+              {(briefQ.data.risks?.length ?? 0) > 0 && (<div className="mt-4"><div className="text-xs uppercase tracking-widest text-muted-foreground">Risks</div><ul className="mt-1 list-disc pl-5 text-sm">{(briefQ.data.risks ?? []).map((r: string, i: number) => <li key={i}>{r}</li>)}</ul></div>)}
+              {(briefQ.data.questions?.length ?? 0) > 0 && (<div className="mt-4"><div className="text-xs uppercase tracking-widest text-muted-foreground">Questions</div><ul className="mt-1 list-disc pl-5 text-sm">{(briefQ.data.questions ?? []).map((r: string, i: number) => <li key={i}>{r}</li>)}</ul></div>)}
             </div>
           )}
         </section>

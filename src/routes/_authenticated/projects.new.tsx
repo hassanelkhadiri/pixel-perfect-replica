@@ -147,12 +147,12 @@ function Grid({ children }: { children: React.ReactNode }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="block"><div className="mb-1 text-xs uppercase tracking-widest text-muted-foreground">{label}</div>{children}</label>;
 }
-function Input({ value, onChange, type = "text", required, placeholder }: any) {
+function Input({ value, onChange, type = "text", required, placeholder }: { value: string; onChange: (v: string) => void; type?: string; required?: boolean; placeholder?: string }) {
   return <input type={type} value={value} required={required} placeholder={placeholder}
     onChange={(e) => onChange(e.target.value)}
     className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />;
 }
-function Textarea({ value, onChange, rows = 3, required }: any) {
+function Textarea({ value, onChange, rows = 3, required }: { value: string; onChange: (v: string) => void; rows?: number; required?: boolean }) {
   return <textarea value={value} required={required} rows={rows}
     onChange={(e) => onChange(e.target.value)}
     className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />;
