@@ -214,8 +214,45 @@ export const decideReview = createServerFn({ method: "POST" })
         await supabase.from("projects").update({ status: "completed" }).eq("id", stage.project_id);
       }
     } else if (data.action === "revision" || data.action === "reject") {
-      await supabase.from("project_stages").update({ status: "active" }).eq("id", stage.id);
+      // Bump rejection counter and reopen the stage
+      const { data: cur } = await supabase.from("project_stages")
+        .select("rejection_count").eq("id", stage.id).single();
+      await supabase.from("project_stages")
+        .update({ status: "active", rejection_count: (cur?.rejection_count ?? 0) + 1 })
+        .eq("id", stage.id);
     }
+    return { ok: true };
+  });
+
+const SetCountdownInput = z.object({
+  stageId: z.string().uuid(),
+  endsAt: z.string().nullable(),
+});
+export const setStageCountdown = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => SetCountdownInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("project_stages")
+      .update({ countdown_ends_at: data.endsAt })
+      .eq("id", data.stageId);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+const AnnotationInput = z.object({
+  stageId: z.string().uuid(),
+  annotation: z.string(),
+});
+export const updateStageAnnotation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => AnnotationInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("project_stages")
+      .update({ annotation: data.annotation || null })
+      .eq("id", data.stageId);
+    if (error) throw error;
     return { ok: true };
   });
 
