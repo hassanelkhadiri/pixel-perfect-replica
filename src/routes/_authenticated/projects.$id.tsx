@@ -170,8 +170,15 @@ function ProjectPage() {
                     currentStage?.id === s.id ? "bg-secondary" : "hover:bg-secondary/60"
                   }`}>
                   <StageIcon s={s.status} />
-                  <div className="flex-1">
-                    <div className={s.status === "locked" ? "text-muted-foreground" : ""}>{s.title}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className={`flex items-center gap-2 ${s.status === "locked" ? "text-muted-foreground" : ""}`}>
+                      <span className="truncate">{s.title}</span>
+                      {s.rejection_count > 0 && (
+                        <span className="ml-auto shrink-0 rounded-full bg-destructive/15 px-1.5 py-0.5 text-[9px] font-medium text-destructive">
+                          ×{s.rejection_count}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.status}</div>
                   </div>
                 </button>
