@@ -251,6 +251,15 @@ function ProjectPage() {
                     </div>
                   </div>
 
+                  <AnnotationPanel
+                    stageId={currentStage.id}
+                    value={currentStage.annotation}
+                    canEdit={isDirector}
+                    onSave={(text) => saveAnnotation.mutate({ stageId: currentStage.id, annotation: text })}
+                    saving={saveAnnotation.isPending}
+                  />
+
+
                   {currentStage.status === "active" && (
                     <div className="mt-6 border-t border-border pt-6">
                       <label className="block">
