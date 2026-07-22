@@ -140,12 +140,18 @@ function ProjectPage() {
   const items = itemsQ.data ?? [];
   const allDone = items.length > 0 && items.every((i) => i.done);
 
+  const approvedCount = stages.filter((s) => s.status === "approved").length;
+  const progressPct = stages.length ? Math.round((approvedCount / stages.length) * 100) : 0;
+
   return (
     <div className="mx-auto max-w-7xl px-6 py-8">
       <Link to="/dashboard" className="mb-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
         <ChevronLeft className="h-3 w-3" /> Dashboard
       </Link>
-      <header className="mb-8 flex items-end justify-between gap-6">
+
+      <BeginnerBanner isDirector={isDirector} />
+
+      <header className="mb-6 flex items-end justify-between gap-6">
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground">
             {project.discipline === "editor" ? "Video Edit" : "Design"} · {project.priority}
@@ -158,6 +164,17 @@ function ProjectPage() {
         </div>
         <StatusPill s={project.status} />
       </header>
+
+      <div className="mb-8 rounded-2xl border border-border bg-surface p-4">
+        <div className="mb-2 flex items-center justify-between text-xs uppercase tracking-widest text-muted-foreground">
+          <span>Overall progress</span>
+          <span className="font-mono text-foreground">{approvedCount}/{stages.length} stages · {progressPct}%</span>
+        </div>
+        <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progressPct}%` }} />
+        </div>
+      </div>
+
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
         {/* Stage rail */}
