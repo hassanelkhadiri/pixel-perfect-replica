@@ -78,12 +78,15 @@ export type Database = {
       }
       project_stages: {
         Row: {
+          annotation: string | null
           common_mistakes: string[] | null
+          countdown_ends_at: string | null
           created_at: string
           decided_at: string | null
           description: string | null
           id: string
           project_id: string
+          rejection_count: number
           senior_tips: string[] | null
           stage_key: string
           stage_order: number
@@ -95,12 +98,15 @@ export type Database = {
           title: string
         }
         Insert: {
+          annotation?: string | null
           common_mistakes?: string[] | null
+          countdown_ends_at?: string | null
           created_at?: string
           decided_at?: string | null
           description?: string | null
           id?: string
           project_id: string
+          rejection_count?: number
           senior_tips?: string[] | null
           stage_key: string
           stage_order: number
@@ -112,12 +118,15 @@ export type Database = {
           title: string
         }
         Update: {
+          annotation?: string | null
           common_mistakes?: string[] | null
+          countdown_ends_at?: string | null
           created_at?: string
           decided_at?: string | null
           description?: string | null
           id?: string
           project_id?: string
+          rejection_count?: number
           senior_tips?: string[] | null
           stage_key?: string
           stage_order?: number

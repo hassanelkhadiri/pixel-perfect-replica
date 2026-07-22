@@ -2,10 +2,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { toggleChecklistItem, submitStageForReview, decideReview, getMe } from "@/lib/projects.functions";
-import { useMemo, useState } from "react";
+import { toggleChecklistItem, submitStageForReview, decideReview, getMe, setStageCountdown, updateStageAnnotation } from "@/lib/projects.functions";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Lock, Circle, CheckCircle2, Clock, XCircle, AlertTriangle, ChevronLeft, Sparkles, Send } from "lucide-react";
+import { Lock, Circle, CheckCircle2, Clock, XCircle, AlertTriangle, ChevronLeft, Sparkles, Send, Timer, Pencil, BookOpen } from "lucide-react";
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({
@@ -13,7 +13,7 @@ export const Route = createFileRoute("/_authenticated/projects/$id")({
 });
 
 type Project = { id: string; client: string; brand: string|null; campaign: string|null; discipline: string; priority: string; deadline: string|null; status: string; current_stage_order: number; brief: string; objective: string|null; audience: string|null; deliverables: string[]|null; assigned_to: string|null };
-type Stage = { id: string; project_id: string; stage_key: string; title: string; description: string|null; time_estimate: string|null; common_mistakes: string[]|null; senior_tips: string[]|null; stage_order: number; status: string; submission_notes: string|null };
+type Stage = { id: string; project_id: string; stage_key: string; title: string; description: string|null; time_estimate: string|null; common_mistakes: string[]|null; senior_tips: string[]|null; stage_order: number; status: string; submission_notes: string|null; countdown_ends_at: string|null; rejection_count: number; annotation: string|null };
 type Item = { id: string; stage_id: string; label: string; done: boolean; item_order: number };
 type Review = { id: string; stage_id: string; action: string; comment: string|null; created_at: string; reviewer_id: string };
 
@@ -85,6 +85,8 @@ function ProjectPage() {
   const toggleFn = useServerFn(toggleChecklistItem);
   const submitFn = useServerFn(submitStageForReview);
   const decideFn = useServerFn(decideReview);
+  const countdownFn = useServerFn(setStageCountdown);
+  const annotationFn = useServerFn(updateStageAnnotation);
 
   const toggle = useMutation({
     mutationFn: (v: { itemId: string; done: boolean }) => toggleFn({ data: v }),
@@ -109,6 +111,21 @@ function ProjectPage() {
       qc.invalidateQueries({ queryKey: ["stages", id] });
       qc.invalidateQueries({ queryKey: ["stage-reviews", currentStage?.id] });
       qc.invalidateQueries({ queryKey: ["project", id] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
+  const setCountdown = useMutation({
+    mutationFn: (v: { stageId: string; endsAt: string | null }) => countdownFn({ data: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["stages", id] }),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
+  const saveAnnotation = useMutation({
+    mutationFn: (v: { stageId: string; annotation: string }) => annotationFn({ data: v }),
+    onSuccess: () => {
+      toast.success("Guidance saved.");
+      qc.invalidateQueries({ queryKey: ["stages", id] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
@@ -153,8 +170,15 @@ function ProjectPage() {
                     currentStage?.id === s.id ? "bg-secondary" : "hover:bg-secondary/60"
                   }`}>
                   <StageIcon s={s.status} />
-                  <div className="flex-1">
-                    <div className={s.status === "locked" ? "text-muted-foreground" : ""}>{s.title}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className={`flex items-center gap-2 ${s.status === "locked" ? "text-muted-foreground" : ""}`}>
+                      <span className="truncate">{s.title}</span>
+                      {s.rejection_count > 0 && (
+                        <span className="ml-auto shrink-0 rounded-full bg-destructive/15 px-1.5 py-0.5 text-[9px] font-medium text-destructive">
+                          ×{s.rejection_count}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.status}</div>
                   </div>
                 </button>
@@ -167,14 +191,32 @@ function ProjectPage() {
         <section className="space-y-6">
           {currentStage && (
             <div className="rounded-2xl border border-border bg-surface p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="text-xs uppercase tracking-widest text-muted-foreground">Stage {currentStage.stage_order} · {currentStage.time_estimate ?? ""}</div>
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="text-xs uppercase tracking-widest text-muted-foreground">
+                    Stage {currentStage.stage_order}
+                    {currentStage.time_estimate ? <> · Suggested {currentStage.time_estimate}</> : null}
+                  </div>
                   <h2 className="mt-1 font-serif text-2xl">{currentStage.title}</h2>
                   <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{currentStage.description}</p>
                 </div>
-                <StatusPill s={currentStage.status} />
+                <div className="flex flex-col items-end gap-2">
+                  <StatusPill s={currentStage.status} />
+                  {currentStage.rejection_count > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2.5 py-1 text-[10px] uppercase tracking-wider text-destructive">
+                      <XCircle className="h-3 w-3" /> {currentStage.rejection_count} rejection{currentStage.rejection_count === 1 ? "" : "s"}
+                    </span>
+                  )}
+                </div>
               </div>
+
+              {currentStage.status !== "locked" && (
+                <CountdownBar
+                  endsAt={currentStage.countdown_ends_at}
+                  onSave={(iso) => setCountdown.mutate({ stageId: currentStage.id, endsAt: iso })}
+                  saving={setCountdown.isPending}
+                />
+              )}
 
               {currentStage.status === "locked" ? (
                 <div className="mt-6 rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
@@ -215,6 +257,15 @@ function ProjectPage() {
                       )}
                     </div>
                   </div>
+
+                  <AnnotationPanel
+                    stageId={currentStage.id}
+                    value={currentStage.annotation}
+                    canEdit={isDirector}
+                    onSave={(text) => saveAnnotation.mutate({ stageId: currentStage.id, annotation: text })}
+                    saving={saveAnnotation.isPending}
+                  />
+
 
                   {currentStage.status === "active" && (
                     <div className="mt-6 border-t border-border pt-6">
@@ -324,4 +375,141 @@ function StatusPill({ s }: { s: string }) {
     archived: "bg-secondary text-muted-foreground",
   };
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] uppercase tracking-wider ${map[s] ?? "bg-secondary"}`}>{s.replace("_"," ")}</span>;
+}
+
+function toLocalInputValue(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function useCountdown(endsAt: string | null) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!endsAt) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [endsAt]);
+  if (!endsAt) return null;
+  const diff = new Date(endsAt).getTime() - now;
+  const over = diff < 0;
+  const abs = Math.abs(diff);
+  const d = Math.floor(abs / 86400000);
+  const h = Math.floor((abs % 86400000) / 3600000);
+  const m = Math.floor((abs % 3600000) / 60000);
+  const s = Math.floor((abs % 60000) / 1000);
+  const parts = d > 0 ? [`${d}d`, `${h}h`, `${m}m`] : h > 0 ? [`${h}h`, `${m}m`, `${s}s`] : [`${m}m`, `${s}s`];
+  return { over, label: parts.join(" ") };
+}
+
+function CountdownBar({ endsAt, onSave, saving }: { endsAt: string | null; onSave: (iso: string | null) => void; saving: boolean }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(toLocalInputValue(endsAt));
+  useEffect(() => setVal(toLocalInputValue(endsAt)), [endsAt]);
+  const cd = useCountdown(endsAt);
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-3 rounded-md border border-border bg-background px-3 py-2 text-sm">
+      <Timer className={`h-4 w-4 ${cd?.over ? "text-destructive" : "text-primary"}`} />
+      {editing ? (
+        <>
+          <input
+            type="datetime-local"
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            className="rounded-md border border-border bg-surface px-2 py-1 text-sm outline-none focus:border-primary"
+          />
+          <button
+            disabled={saving}
+            onClick={() => {
+              const iso = val ? new Date(val).toISOString() : null;
+              onSave(iso);
+              setEditing(false);
+            }}
+            className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40">
+            Save
+          </button>
+          <button onClick={() => { setEditing(false); setVal(toLocalInputValue(endsAt)); }}
+            className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground hover:text-foreground">
+            Cancel
+          </button>
+          {endsAt && (
+            <button onClick={() => { onSave(null); setEditing(false); }}
+              className="ml-auto text-xs text-destructive hover:opacity-80">
+              Clear
+            </button>
+          )}
+        </>
+      ) : cd ? (
+        <>
+          <span className={`font-mono tabular-nums ${cd.over ? "text-destructive" : "text-foreground"}`}>
+            {cd.over ? "Overdue by " : ""}{cd.label}{cd.over ? "" : " remaining"}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            · Ends {format(new Date(endsAt!), "MMM d, HH:mm")}
+          </span>
+          <button onClick={() => setEditing(true)} className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+            <Pencil className="h-3 w-3" /> Edit
+          </button>
+        </>
+      ) : (
+        <>
+          <span className="text-muted-foreground">No countdown set for this stage.</span>
+          <button onClick={() => setEditing(true)} className="ml-auto inline-flex items-center gap-1 text-xs text-primary hover:opacity-80">
+            <Pencil className="h-3 w-3" /> Set countdown
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function AnnotationPanel({ stageId, value, canEdit, onSave, saving }: {
+  stageId: string; value: string | null; canEdit: boolean; onSave: (text: string) => void; saving: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(value ?? "");
+  useEffect(() => { setText(value ?? ""); setEditing(false); }, [stageId, value]);
+
+  if (!value && !canEdit) return null;
+
+  return (
+    <div className="mt-6 rounded-md border border-primary/30 bg-primary/5 p-4">
+      <div className="mb-2 flex items-center gap-2">
+        <BookOpen className="h-4 w-4 text-primary" />
+        <h3 className="text-xs uppercase tracking-widest text-primary">Guidance for this step</h3>
+        {canEdit && !editing && (
+          <button onClick={() => setEditing(true)} className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+            <Pencil className="h-3 w-3" /> {value ? "Edit" : "Add"}
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <>
+          <textarea
+            rows={5}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            placeholder="Explain what a senior would look for here. What to watch out for, what 'great' looks like, examples to study."
+          />
+          <div className="mt-2 flex gap-2">
+            <button disabled={saving} onClick={() => { onSave(text.trim()); setEditing(false); }}
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40">
+              Save guidance
+            </button>
+            <button onClick={() => { setText(value ?? ""); setEditing(false); }}
+              className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground">
+              Cancel
+            </button>
+          </div>
+        </>
+      ) : value ? (
+        <p className="whitespace-pre-wrap text-sm text-foreground/90">{value}</p>
+      ) : (
+        <p className="text-sm italic text-muted-foreground">No guidance yet — add a note to help the creator learn.</p>
+      )}
+    </div>
+  );
 }
