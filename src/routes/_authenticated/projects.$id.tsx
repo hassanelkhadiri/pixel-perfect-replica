@@ -284,6 +284,10 @@ function ProjectPage() {
                     saving={saveAnnotation.isPending}
                   />
 
+                  <CoachChat stageId={currentStage.id} stageTitle={currentStage.title} />
+
+
+
 
                   {currentStage.status === "active" && (
                     <div className="mt-6 border-t border-border pt-6">
