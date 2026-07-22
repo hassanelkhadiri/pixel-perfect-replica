@@ -184,14 +184,32 @@ function ProjectPage() {
         <section className="space-y-6">
           {currentStage && (
             <div className="rounded-2xl border border-border bg-surface p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="text-xs uppercase tracking-widest text-muted-foreground">Stage {currentStage.stage_order} · {currentStage.time_estimate ?? ""}</div>
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="text-xs uppercase tracking-widest text-muted-foreground">
+                    Stage {currentStage.stage_order}
+                    {currentStage.time_estimate ? <> · Suggested {currentStage.time_estimate}</> : null}
+                  </div>
                   <h2 className="mt-1 font-serif text-2xl">{currentStage.title}</h2>
                   <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{currentStage.description}</p>
                 </div>
-                <StatusPill s={currentStage.status} />
+                <div className="flex flex-col items-end gap-2">
+                  <StatusPill s={currentStage.status} />
+                  {currentStage.rejection_count > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2.5 py-1 text-[10px] uppercase tracking-wider text-destructive">
+                      <XCircle className="h-3 w-3" /> {currentStage.rejection_count} rejection{currentStage.rejection_count === 1 ? "" : "s"}
+                    </span>
+                  )}
+                </div>
               </div>
+
+              {currentStage.status !== "locked" && (
+                <CountdownBar
+                  endsAt={currentStage.countdown_ends_at}
+                  onSave={(iso) => setCountdown.mutate({ stageId: currentStage.id, endsAt: iso })}
+                  saving={setCountdown.isPending}
+                />
+              )}
 
               {currentStage.status === "locked" ? (
                 <div className="mt-6 rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
