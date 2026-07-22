@@ -2,10 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { toggleChecklistItem, submitStageForReview, decideReview, getMe, setStageCountdown, updateStageAnnotation } from "@/lib/projects.functions";
-import { useEffect, useMemo, useState } from "react";
+import { toggleChecklistItem, submitStageForReview, decideReview, getMe, setStageCountdown, updateStageAnnotation, askCoach, suggestStageAnnotation } from "@/lib/projects.functions";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Lock, Circle, CheckCircle2, Clock, XCircle, AlertTriangle, ChevronLeft, Sparkles, Send, Timer, Pencil, BookOpen } from "lucide-react";
+import { Lock, Circle, CheckCircle2, Clock, XCircle, AlertTriangle, ChevronLeft, Sparkles, Send, Timer, Pencil, BookOpen, MessageCircleQuestion, Wand2, X } from "lucide-react";
+
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({
@@ -139,12 +140,18 @@ function ProjectPage() {
   const items = itemsQ.data ?? [];
   const allDone = items.length > 0 && items.every((i) => i.done);
 
+  const approvedCount = stages.filter((s) => s.status === "approved").length;
+  const progressPct = stages.length ? Math.round((approvedCount / stages.length) * 100) : 0;
+
   return (
     <div className="mx-auto max-w-7xl px-6 py-8">
       <Link to="/dashboard" className="mb-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
         <ChevronLeft className="h-3 w-3" /> Dashboard
       </Link>
-      <header className="mb-8 flex items-end justify-between gap-6">
+
+      <BeginnerBanner isDirector={isDirector} />
+
+      <header className="mb-6 flex items-end justify-between gap-6">
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground">
             {project.discipline === "editor" ? "Video Edit" : "Design"} · {project.priority}
@@ -157,6 +164,17 @@ function ProjectPage() {
         </div>
         <StatusPill s={project.status} />
       </header>
+
+      <div className="mb-8 rounded-2xl border border-border bg-surface p-4">
+        <div className="mb-2 flex items-center justify-between text-xs uppercase tracking-widest text-muted-foreground">
+          <span>Overall progress</span>
+          <span className="font-mono text-foreground">{approvedCount}/{stages.length} stages · {progressPct}%</span>
+        </div>
+        <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progressPct}%` }} />
+        </div>
+      </div>
+
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
         {/* Stage rail */}
@@ -265,6 +283,10 @@ function ProjectPage() {
                     onSave={(text) => saveAnnotation.mutate({ stageId: currentStage.id, annotation: text })}
                     saving={saveAnnotation.isPending}
                   />
+
+                  <CoachChat stageId={currentStage.id} stageTitle={currentStage.title} />
+
+
 
 
                   {currentStage.status === "active" && (
@@ -472,6 +494,13 @@ function AnnotationPanel({ stageId, value, canEdit, onSave, saving }: {
   const [text, setText] = useState(value ?? "");
   useEffect(() => { setText(value ?? ""); setEditing(false); }, [stageId, value]);
 
+  const suggestFn = useServerFn(suggestStageAnnotation);
+  const suggest = useMutation({
+    mutationFn: () => suggestFn({ data: { stageId } }),
+    onSuccess: (r) => { setText((prev) => (prev ? prev + "\n\n" : "") + r.suggestion); setEditing(true); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
   if (!value && !canEdit) return null;
 
   return (
@@ -488,13 +517,13 @@ function AnnotationPanel({ stageId, value, canEdit, onSave, saving }: {
       {editing ? (
         <>
           <textarea
-            rows={5}
+            rows={6}
             value={text}
             onChange={(e) => setText(e.target.value)}
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
             placeholder="Explain what a senior would look for here. What to watch out for, what 'great' looks like, examples to study."
           />
-          <div className="mt-2 flex gap-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             <button disabled={saving} onClick={() => { onSave(text.trim()); setEditing(false); }}
               className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40">
               Save guidance
@@ -503,13 +532,137 @@ function AnnotationPanel({ stageId, value, canEdit, onSave, saving }: {
               className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground">
               Cancel
             </button>
+            <button disabled={suggest.isPending} onClick={() => suggest.mutate()}
+              className="ml-auto inline-flex items-center gap-1 rounded-md border border-primary/40 px-3 py-1.5 text-xs text-primary hover:bg-primary/10 disabled:opacity-40">
+              <Wand2 className="h-3 w-3" /> {suggest.isPending ? "Thinking…" : "AI-suggest guidance"}
+            </button>
           </div>
         </>
       ) : value ? (
         <p className="whitespace-pre-wrap text-sm text-foreground/90">{value}</p>
       ) : (
-        <p className="text-sm italic text-muted-foreground">No guidance yet — add a note to help the creator learn.</p>
+        <div className="space-y-2">
+          <p className="text-sm italic text-muted-foreground">No guidance yet — add a note to help the creator learn.</p>
+          <button disabled={suggest.isPending} onClick={() => suggest.mutate()}
+            className="inline-flex items-center gap-1 rounded-md border border-primary/40 px-3 py-1.5 text-xs text-primary hover:bg-primary/10 disabled:opacity-40">
+            <Wand2 className="h-3 w-3" /> {suggest.isPending ? "Thinking…" : "AI-suggest guidance"}
+          </button>
+        </div>
       )}
     </div>
   );
 }
+
+function BeginnerBanner({ isDirector }: { isDirector: boolean }) {
+  const [dismissed, setDismissed] = useState(true);
+  useEffect(() => {
+    setDismissed(typeof window !== "undefined" && localStorage.getItem("beginner-banner-dismissed") === "1");
+  }, []);
+  if (dismissed) return null;
+  const steps = isDirector
+    ? [
+        "Set a countdown per stage so the team knows their runway.",
+        "Add or AI-generate Guidance so juniors learn what 'great' looks like.",
+        "Review submissions with Approve, Needs revision, or Reject — rejections bump the ×N badge.",
+      ]
+    : [
+        "Work top-to-bottom: tick every checklist item before submitting.",
+        "Read the Senior tips and Guidance — that's how you learn what 'great' looks like.",
+        "Stuck? Ask the AI Coach below the stage — it knows your brief.",
+        "Countdown running low? Talk to your director early, not late.",
+      ];
+  return (
+    <div className="mb-6 rounded-2xl border border-primary/30 bg-primary/5 p-4">
+      <div className="mb-2 flex items-center gap-2">
+        <Sparkles className="h-4 w-4 text-primary" />
+        <span className="text-xs font-medium uppercase tracking-widest text-primary">
+          {isDirector ? "How to run this project" : "How to work this project"}
+        </span>
+        <button
+          onClick={() => { localStorage.setItem("beginner-banner-dismissed", "1"); setDismissed(true); }}
+          className="ml-auto text-muted-foreground hover:text-foreground" aria-label="Dismiss">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <ol className="grid gap-1 text-sm text-foreground/85 sm:grid-cols-2">
+        {steps.map((s, i) => (
+          <li key={i} className="flex gap-2"><span className="text-primary">{i + 1}.</span>{s}</li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function CoachChat({ stageId, stageTitle }: { stageId: string; stageTitle: string }) {
+  const askFn = useServerFn(askCoach);
+  const [messages, setMessages] = useState<{ role: "you" | "coach"; text: string }[]>([]);
+  const [q, setQ] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { setMessages([]); setQ(""); }, [stageId]);
+  useEffect(() => { scrollRef.current?.scrollTo({ top: 9e6 }); }, [messages]);
+
+  const ask = useMutation({
+    mutationFn: (question: string) => askFn({ data: { stageId, question } }),
+    onSuccess: (r) => setMessages((m) => [...m, { role: "coach", text: r.answer }]),
+    onError: (e) => {
+      const msg = e instanceof Error ? e.message : "Failed";
+      setMessages((m) => [...m, { role: "coach", text: `⚠ ${msg}` }]);
+    },
+  });
+
+  const send = () => {
+    const question = q.trim();
+    if (!question || ask.isPending) return;
+    setMessages((m) => [...m, { role: "you", text: question }]);
+    setQ("");
+    ask.mutate(question);
+  };
+
+  const suggestions = [
+    `How do I start "${stageTitle}"?`,
+    `What does a great "${stageTitle}" look like?`,
+    `What mistakes should I avoid here?`,
+  ];
+
+  return (
+    <div className="mt-6 rounded-md border border-border bg-background p-4">
+      <div className="mb-2 flex items-center gap-2">
+        <MessageCircleQuestion className="h-4 w-4 text-primary" />
+        <h3 className="text-xs uppercase tracking-widest text-muted-foreground">AI coach · ask a senior anything</h3>
+      </div>
+      {messages.length === 0 ? (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {suggestions.map((s) => (
+            <button key={s} onClick={() => { setQ(s); }} className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:border-primary/60 hover:text-foreground">
+              {s}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div ref={scrollRef} className="mb-3 max-h-64 space-y-2 overflow-y-auto">
+          {messages.map((m, i) => (
+            <div key={i} className={`rounded-md px-3 py-2 text-sm ${m.role === "you" ? "bg-secondary text-foreground" : "bg-primary/10 text-foreground/90"}`}>
+              <div className="mb-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">{m.role === "you" ? "You" : "Coach"}</div>
+              <div className="whitespace-pre-wrap">{m.text}</div>
+            </div>
+          ))}
+          {ask.isPending && <div className="text-xs italic text-muted-foreground">Coach is thinking…</div>}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") send(); }}
+          placeholder="e.g. how do I structure the moodboard?"
+          className="flex-1 rounded-md border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+        />
+        <button onClick={send} disabled={!q.trim() || ask.isPending}
+          className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40">
+          <Send className="h-4 w-4" /> Ask
+        </button>
+      </div>
+    </div>
+  );
+}
+

@@ -256,6 +256,93 @@ export const updateStageAnnotation = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+const AskCoachInput = z.object({
+  stageId: z.string().uuid(),
+  question: z.string().min(1).max(2000),
+});
+export const askCoach = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => AskCoachInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: stage, error } = await supabase
+      .from("project_stages")
+      .select("title, description, senior_tips, common_mistakes, stage_key, project_id")
+      .eq("id", data.stageId).single();
+    if (error || !stage) throw error ?? new Error("Stage not found");
+    const { data: project } = await supabase
+      .from("projects").select("client, brand, campaign, discipline, brief, objective, audience")
+      .eq("id", stage.project_id).single();
+
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("Missing LOVABLE_API_KEY");
+    const gateway = createLovableAiGatewayProvider(apiKey);
+
+    const prompt = `You are a warm, patient Senior Creative Director mentoring a junior ${project?.discipline ?? ""} teammate. Answer the question below in plain, encouraging language a beginner will understand. Be specific and actionable — reference concrete steps, tools, or examples where helpful. Keep it under 180 words. Never be condescending.
+
+Current stage: ${stage.title}
+Stage goal: ${stage.description ?? ""}
+Senior tips already shown: ${(stage.senior_tips ?? []).join(" | ")}
+Common mistakes already shown: ${(stage.common_mistakes ?? []).join(" | ")}
+
+Project context:
+- Client: ${project?.client ?? "—"} (${project?.brand ?? "—"})
+- Campaign: ${project?.campaign ?? "—"}
+- Objective: ${project?.objective ?? "—"}
+- Audience: ${project?.audience ?? "—"}
+- Brief: ${project?.brief ?? "—"}
+
+Question from the teammate: ${data.question}`;
+
+    try {
+      const { text } = await generateText({ model: gateway("google/gemini-3.5-flash"), prompt });
+      return { answer: text.trim() };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("429")) throw new Error("AI rate limit reached. Try again in a moment.");
+      if (msg.includes("402")) throw new Error("AI credits exhausted. Please add credits in Cloud settings.");
+      throw new Error("The coach couldn't respond. Try again.");
+    }
+  });
+
+const SuggestAnnotationInput = z.object({ stageId: z.string().uuid() });
+export const suggestStageAnnotation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => SuggestAnnotationInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: stage, error } = await supabase
+      .from("project_stages")
+      .select("title, description, senior_tips, common_mistakes, project_id")
+      .eq("id", data.stageId).single();
+    if (error || !stage) throw error ?? new Error("Stage not found");
+    const { data: project } = await supabase
+      .from("projects").select("client, brand, discipline, brief, objective, audience")
+      .eq("id", stage.project_id).single();
+
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("Missing LOVABLE_API_KEY");
+    const gateway = createLovableAiGatewayProvider(apiKey);
+
+    const prompt = `You are a Senior Creative Director writing a short guidance note for a junior ${project?.discipline ?? ""} at the "${stage.title}" stage. Write 4–6 short bullet lines (use "•" prefix) that teach: what "great" looks like here, one concrete example to study, one trap to avoid, and one specific action to take first. Beginner-friendly, warm, specific to this project. No preamble.
+
+Stage goal: ${stage.description ?? ""}
+Client: ${project?.client ?? "—"} (${project?.brand ?? "—"})
+Objective: ${project?.objective ?? "—"}
+Audience: ${project?.audience ?? "—"}
+Brief: ${project?.brief ?? "—"}`;
+
+    try {
+      const { text } = await generateText({ model: gateway("google/gemini-3.5-flash"), prompt });
+      return { suggestion: text.trim() };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("429")) throw new Error("AI rate limit reached. Try again in a moment.");
+      if (msg.includes("402")) throw new Error("AI credits exhausted. Please add credits in Cloud settings.");
+      throw new Error("Couldn't generate guidance. Try again.");
+    }
+  });
+
 export const getMe = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -264,3 +351,4 @@ export const getMe = createServerFn({ method: "GET" })
     const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
     return { userId, profile, roles: (roles ?? []).map((r) => r.role) };
   });
+
