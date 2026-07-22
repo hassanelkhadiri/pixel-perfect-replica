@@ -2,10 +2,10 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { toggleChecklistItem, submitStageForReview, decideReview, getMe } from "@/lib/projects.functions";
-import { useMemo, useState } from "react";
+import { toggleChecklistItem, submitStageForReview, decideReview, getMe, setStageCountdown, updateStageAnnotation } from "@/lib/projects.functions";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Lock, Circle, CheckCircle2, Clock, XCircle, AlertTriangle, ChevronLeft, Sparkles, Send } from "lucide-react";
+import { Lock, Circle, CheckCircle2, Clock, XCircle, AlertTriangle, ChevronLeft, Sparkles, Send, Timer, Pencil, BookOpen } from "lucide-react";
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({
@@ -13,7 +13,7 @@ export const Route = createFileRoute("/_authenticated/projects/$id")({
 });
 
 type Project = { id: string; client: string; brand: string|null; campaign: string|null; discipline: string; priority: string; deadline: string|null; status: string; current_stage_order: number; brief: string; objective: string|null; audience: string|null; deliverables: string[]|null; assigned_to: string|null };
-type Stage = { id: string; project_id: string; stage_key: string; title: string; description: string|null; time_estimate: string|null; common_mistakes: string[]|null; senior_tips: string[]|null; stage_order: number; status: string; submission_notes: string|null };
+type Stage = { id: string; project_id: string; stage_key: string; title: string; description: string|null; time_estimate: string|null; common_mistakes: string[]|null; senior_tips: string[]|null; stage_order: number; status: string; submission_notes: string|null; countdown_ends_at: string|null; rejection_count: number; annotation: string|null };
 type Item = { id: string; stage_id: string; label: string; done: boolean; item_order: number };
 type Review = { id: string; stage_id: string; action: string; comment: string|null; created_at: string; reviewer_id: string };
 
