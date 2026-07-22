@@ -85,6 +85,8 @@ function ProjectPage() {
   const toggleFn = useServerFn(toggleChecklistItem);
   const submitFn = useServerFn(submitStageForReview);
   const decideFn = useServerFn(decideReview);
+  const countdownFn = useServerFn(setStageCountdown);
+  const annotationFn = useServerFn(updateStageAnnotation);
 
   const toggle = useMutation({
     mutationFn: (v: { itemId: string; done: boolean }) => toggleFn({ data: v }),
@@ -109,6 +111,21 @@ function ProjectPage() {
       qc.invalidateQueries({ queryKey: ["stages", id] });
       qc.invalidateQueries({ queryKey: ["stage-reviews", currentStage?.id] });
       qc.invalidateQueries({ queryKey: ["project", id] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
+  const setCountdown = useMutation({
+    mutationFn: (v: { stageId: string; endsAt: string | null }) => countdownFn({ data: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["stages", id] }),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
+  const saveAnnotation = useMutation({
+    mutationFn: (v: { stageId: string; annotation: string }) => annotationFn({ data: v }),
+    onSuccess: () => {
+      toast.success("Guidance saved.");
+      qc.invalidateQueries({ queryKey: ["stages", id] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
