@@ -376,3 +376,140 @@ function StatusPill({ s }: { s: string }) {
   };
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] uppercase tracking-wider ${map[s] ?? "bg-secondary"}`}>{s.replace("_"," ")}</span>;
 }
+
+function toLocalInputValue(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function useCountdown(endsAt: string | null) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!endsAt) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [endsAt]);
+  if (!endsAt) return null;
+  const diff = new Date(endsAt).getTime() - now;
+  const over = diff < 0;
+  const abs = Math.abs(diff);
+  const d = Math.floor(abs / 86400000);
+  const h = Math.floor((abs % 86400000) / 3600000);
+  const m = Math.floor((abs % 3600000) / 60000);
+  const s = Math.floor((abs % 60000) / 1000);
+  const parts = d > 0 ? [`${d}d`, `${h}h`, `${m}m`] : h > 0 ? [`${h}h`, `${m}m`, `${s}s`] : [`${m}m`, `${s}s`];
+  return { over, label: parts.join(" ") };
+}
+
+function CountdownBar({ endsAt, onSave, saving }: { endsAt: string | null; onSave: (iso: string | null) => void; saving: boolean }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(toLocalInputValue(endsAt));
+  useEffect(() => setVal(toLocalInputValue(endsAt)), [endsAt]);
+  const cd = useCountdown(endsAt);
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-3 rounded-md border border-border bg-background px-3 py-2 text-sm">
+      <Timer className={`h-4 w-4 ${cd?.over ? "text-destructive" : "text-primary"}`} />
+      {editing ? (
+        <>
+          <input
+            type="datetime-local"
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            className="rounded-md border border-border bg-surface px-2 py-1 text-sm outline-none focus:border-primary"
+          />
+          <button
+            disabled={saving}
+            onClick={() => {
+              const iso = val ? new Date(val).toISOString() : null;
+              onSave(iso);
+              setEditing(false);
+            }}
+            className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40">
+            Save
+          </button>
+          <button onClick={() => { setEditing(false); setVal(toLocalInputValue(endsAt)); }}
+            className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground hover:text-foreground">
+            Cancel
+          </button>
+          {endsAt && (
+            <button onClick={() => { onSave(null); setEditing(false); }}
+              className="ml-auto text-xs text-destructive hover:opacity-80">
+              Clear
+            </button>
+          )}
+        </>
+      ) : cd ? (
+        <>
+          <span className={`font-mono tabular-nums ${cd.over ? "text-destructive" : "text-foreground"}`}>
+            {cd.over ? "Overdue by " : ""}{cd.label}{cd.over ? "" : " remaining"}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            · Ends {format(new Date(endsAt!), "MMM d, HH:mm")}
+          </span>
+          <button onClick={() => setEditing(true)} className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+            <Pencil className="h-3 w-3" /> Edit
+          </button>
+        </>
+      ) : (
+        <>
+          <span className="text-muted-foreground">No countdown set for this stage.</span>
+          <button onClick={() => setEditing(true)} className="ml-auto inline-flex items-center gap-1 text-xs text-primary hover:opacity-80">
+            <Pencil className="h-3 w-3" /> Set countdown
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function AnnotationPanel({ stageId, value, canEdit, onSave, saving }: {
+  stageId: string; value: string | null; canEdit: boolean; onSave: (text: string) => void; saving: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(value ?? "");
+  useEffect(() => { setText(value ?? ""); setEditing(false); }, [stageId, value]);
+
+  if (!value && !canEdit) return null;
+
+  return (
+    <div className="mt-6 rounded-md border border-primary/30 bg-primary/5 p-4">
+      <div className="mb-2 flex items-center gap-2">
+        <BookOpen className="h-4 w-4 text-primary" />
+        <h3 className="text-xs uppercase tracking-widest text-primary">Guidance for this step</h3>
+        {canEdit && !editing && (
+          <button onClick={() => setEditing(true)} className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+            <Pencil className="h-3 w-3" /> {value ? "Edit" : "Add"}
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <>
+          <textarea
+            rows={5}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            placeholder="Explain what a senior would look for here. What to watch out for, what 'great' looks like, examples to study."
+          />
+          <div className="mt-2 flex gap-2">
+            <button disabled={saving} onClick={() => { onSave(text.trim()); setEditing(false); }}
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40">
+              Save guidance
+            </button>
+            <button onClick={() => { setText(value ?? ""); setEditing(false); }}
+              className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground">
+              Cancel
+            </button>
+          </div>
+        </>
+      ) : value ? (
+        <p className="whitespace-pre-wrap text-sm text-foreground/90">{value}</p>
+      ) : (
+        <p className="text-sm italic text-muted-foreground">No guidance yet — add a note to help the creator learn.</p>
+      )}
+    </div>
+  );
+}
