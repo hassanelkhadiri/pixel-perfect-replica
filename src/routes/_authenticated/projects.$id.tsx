@@ -2,10 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { toggleChecklistItem, submitStageForReview, decideReview, getMe, setStageCountdown, updateStageAnnotation } from "@/lib/projects.functions";
-import { useEffect, useMemo, useState } from "react";
+import { toggleChecklistItem, submitStageForReview, decideReview, getMe, setStageCountdown, updateStageAnnotation, askCoach, suggestStageAnnotation } from "@/lib/projects.functions";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Lock, Circle, CheckCircle2, Clock, XCircle, AlertTriangle, ChevronLeft, Sparkles, Send, Timer, Pencil, BookOpen } from "lucide-react";
+import { Lock, Circle, CheckCircle2, Clock, XCircle, AlertTriangle, ChevronLeft, Sparkles, Send, Timer, Pencil, BookOpen, MessageCircleQuestion, Wand2, X } from "lucide-react";
+
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/projects/$id")({
