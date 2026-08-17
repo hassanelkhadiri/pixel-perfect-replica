@@ -2,14 +2,15 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { toggleChecklistItem, submitStageForReview, decideReview, getMe, setStageCountdown, updateStageAnnotation, askCoach, suggestStageAnnotation } from "@/lib/projects.functions";
+import { toggleChecklistItem, submitStageForReview, decideReview, setStageCountdown, updateStageAnnotation, askCoach, suggestStageAnnotation } from "@/lib/projects.functions";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useViewRole } from "@/lib/use-role";
 import { toast } from "sonner";
 import { Lock, Circle, CheckCircle2, Clock, XCircle, AlertTriangle, ChevronLeft, Sparkles, Send, Timer, Pencil, BookOpen, MessageCircleQuestion, Wand2, X } from "lucide-react";
 
 import { format } from "date-fns";
 
-export const Route = createFileRoute("/_authenticated/projects/$id")({
+export const Route = createFileRoute("/_app/projects/$id")({
   component: ProjectPage,
 });
 
@@ -21,10 +22,7 @@ type Review = { id: string; stage_id: string; action: string; comment: string|nu
 function ProjectPage() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
-  const fetchMe = useServerFn(getMe);
-  const meQ = useQuery({ queryKey: ["me"], queryFn: () => fetchMe() });
-  const me = meQ.data;
-  const isDirector = me?.roles.includes("director") ?? false;
+  const { isDirector } = useViewRole();
 
   const projectQ = useQuery({
     queryKey: ["project", id],

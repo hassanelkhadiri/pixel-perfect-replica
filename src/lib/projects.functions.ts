@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import { stagesFor, type Discipline } from "@/lib/workflows";
 import { generateText } from "ai";
@@ -22,14 +21,10 @@ const CreateProjectInput = z.object({
 });
 
 export const createProject = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => CreateProjectInput.parse(input))
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-
-    // Only directors can create
-    const { data: isDirector } = await supabase.rpc("has_role", { _user_id: userId, _role: "director" });
-    if (!isDirector) throw new Error("Only directors can create projects.");
+  .handler(async ({ data }) => {
+    const { db } = await import("@/lib/db.server");
+    const supabase = db();
 
     const { data: project, error } = await supabase
       .from("projects")
@@ -46,8 +41,7 @@ export const createProject = createServerFn({ method: "POST" })
         brief: data.brief,
         notes: data.notes || null,
         discipline: data.discipline as Discipline,
-        created_by: userId,
-        assigned_to: data.assigned_to ?? userId,
+          assigned_to: data.assigned_to ?? null,
         current_stage_order: 1,
       })
       .select()
@@ -87,10 +81,10 @@ export const createProject = createServerFn({ method: "POST" })
 const GenerateBriefInput = z.object({ projectId: z.string().uuid() });
 
 export const generateBriefInsights = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => GenerateBriefInput.parse(input))
-  .handler(async ({ data, context }) => {
-    const { supabase } = context;
+  .handler(async ({ data }) => {
+    const { db } = await import("@/lib/db.server");
+    const supabase = db();
     const { data: project, error } = await supabase
       .from("projects").select("*").eq("id", data.projectId).single();
     if (error || !project) throw error ?? new Error("Project not found");
@@ -150,10 +144,11 @@ Project:
 
 const ToggleChecklistInput = z.object({ itemId: z.string().uuid(), done: z.boolean() });
 export const toggleChecklistItem = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => ToggleChecklistInput.parse(input))
-  .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+  .handler(async ({ data }) => {
+    const { db } = await import("@/lib/db.server");
+    const supabase = db();
+    const { error } = await supabase
       .from("stage_checklist_items").update({ done: data.done }).eq("id", data.itemId);
     if (error) throw error;
     return { ok: true };
@@ -161,10 +156,11 @@ export const toggleChecklistItem = createServerFn({ method: "POST" })
 
 const SubmitInput = z.object({ stageId: z.string().uuid(), notes: z.string().optional() });
 export const submitStageForReview = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => SubmitInput.parse(input))
-  .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+  .handler(async ({ data }) => {
+    const { db } = await import("@/lib/db.server");
+    const supabase = db();
+    const { error } = await supabase
       .from("project_stages")
       .update({ status: "in_review", submitted_at: new Date().toISOString(), submission_notes: data.notes ?? null })
       .eq("id", data.stageId);
@@ -179,13 +175,10 @@ const DecideInput = z.object({
   priority: z.enum(["low","medium","high","urgent"]).default("medium"),
 });
 export const decideReview = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => DecideInput.parse(input))
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const { data: isDirector } = await supabase.rpc("has_role", { _user_id: userId, _role: "director" });
-    if (!isDirector) throw new Error("Only directors can decide reviews.");
-
+  .handler(async ({ data }) => {
+    const { db } = await import("@/lib/db.server");
+    const supabase = db();
     const { data: stage, error: sErr } = await supabase.from("project_stages")
       .select("id, project_id, stage_order").eq("id", data.stageId).single();
     if (sErr || !stage) throw sErr ?? new Error("Stage not found");
@@ -199,7 +192,7 @@ export const decideReview = createServerFn({ method: "POST" })
     if (uErr) throw uErr;
 
     await supabase.from("reviews").insert({
-      stage_id: stage.id, reviewer_id: userId,
+      stage_id: stage.id,
       action: data.action, comment: data.comment || null, priority: data.priority,
     });
 
@@ -229,10 +222,11 @@ const SetCountdownInput = z.object({
   endsAt: z.string().nullable(),
 });
 export const setStageCountdown = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => SetCountdownInput.parse(input))
-  .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+  .handler(async ({ data }) => {
+    const { db } = await import("@/lib/db.server");
+    const supabase = db();
+    const { error } = await supabase
       .from("project_stages")
       .update({ countdown_ends_at: data.endsAt })
       .eq("id", data.stageId);
@@ -245,10 +239,11 @@ const AnnotationInput = z.object({
   annotation: z.string(),
 });
 export const updateStageAnnotation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => AnnotationInput.parse(input))
-  .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+  .handler(async ({ data }) => {
+    const { db } = await import("@/lib/db.server");
+    const supabase = db();
+    const { error } = await supabase
       .from("project_stages")
       .update({ annotation: data.annotation || null })
       .eq("id", data.stageId);
@@ -261,10 +256,10 @@ const AskCoachInput = z.object({
   question: z.string().min(1).max(2000),
 });
 export const askCoach = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => AskCoachInput.parse(input))
-  .handler(async ({ data, context }) => {
-    const { supabase } = context;
+  .handler(async ({ data }) => {
+    const { db } = await import("@/lib/db.server");
+    const supabase = db();
     const { data: stage, error } = await supabase
       .from("project_stages")
       .select("title, description, senior_tips, common_mistakes, stage_key, project_id")
@@ -307,10 +302,10 @@ Question from the teammate: ${data.question}`;
 
 const SuggestAnnotationInput = z.object({ stageId: z.string().uuid() });
 export const suggestStageAnnotation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => SuggestAnnotationInput.parse(input))
-  .handler(async ({ data, context }) => {
-    const { supabase } = context;
+  .handler(async ({ data }) => {
+    const { db } = await import("@/lib/db.server");
+    const supabase = db();
     const { data: stage, error } = await supabase
       .from("project_stages")
       .select("title, description, senior_tips, common_mistakes, project_id")
@@ -342,13 +337,3 @@ Brief: ${project?.brief ?? "—"}`;
       throw new Error("Couldn't generate guidance. Try again.");
     }
   });
-
-export const getMe = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { data: profile } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
-    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
-    return { userId, profile, roles: (roles ?? []).map((r) => r.role) };
-  });
-

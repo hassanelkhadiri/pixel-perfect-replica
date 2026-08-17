@@ -55,27 +55,6 @@ export type Database = {
           },
         ]
       }
-      profiles: {
-        Row: {
-          avatar_url: string | null
-          created_at: string
-          display_name: string | null
-          id: string
-        }
-        Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          display_name?: string | null
-          id: string
-        }
-        Update: {
-          avatar_url?: string | null
-          created_at?: string
-          display_name?: string | null
-          id?: string
-        }
-        Relationships: []
-      }
       project_stages: {
         Row: {
           annotation: string | null
@@ -156,7 +135,7 @@ export type Database = {
           campaign: string | null
           client: string
           created_at: string
-          created_by: string
+          created_by: string | null
           current_stage_order: number
           deadline: string | null
           deliverables: string[] | null
@@ -177,7 +156,7 @@ export type Database = {
           campaign?: string | null
           client: string
           created_at?: string
-          created_by: string
+          created_by?: string | null
           current_stage_order?: number
           deadline?: string | null
           deliverables?: string[] | null
@@ -198,7 +177,7 @@ export type Database = {
           campaign?: string | null
           client?: string
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           current_stage_order?: number
           deadline?: string | null
           deliverables?: string[] | null
@@ -220,7 +199,7 @@ export type Database = {
           created_at: string
           id: string
           priority: Database["public"]["Enums"]["priority_level"] | null
-          reviewer_id: string
+          reviewer_id: string | null
           stage_id: string
         }
         Insert: {
@@ -229,7 +208,7 @@ export type Database = {
           created_at?: string
           id?: string
           priority?: Database["public"]["Enums"]["priority_level"] | null
-          reviewer_id: string
+          reviewer_id?: string | null
           stage_id: string
         }
         Update: {
@@ -238,7 +217,7 @@ export type Database = {
           created_at?: string
           id?: string
           priority?: Database["public"]["Enums"]["priority_level"] | null
-          reviewer_id?: string
+          reviewer_id?: string | null
           stage_id?: string
         }
         Relationships: [
@@ -283,42 +262,14 @@ export type Database = {
           },
         ]
       }
-      user_roles: {
-        Row: {
-          created_at: string
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
-      app_role: "director" | "designer" | "editor"
       priority_level: "low" | "medium" | "high" | "urgent"
       project_discipline: "designer" | "editor"
       project_status: "active" | "completed" | "archived"
@@ -457,7 +408,6 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["director", "designer", "editor"],
       priority_level: ["low", "medium", "high", "urgent"],
       project_discipline: ["designer", "editor"],
       project_status: ["active", "completed", "archived"],
