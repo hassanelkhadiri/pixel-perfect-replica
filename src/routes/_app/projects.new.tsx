@@ -6,7 +6,7 @@ import { createProject, generateBriefInsights } from "@/lib/projects.functions";
 import { toast } from "sonner";
 import { Sparkles, Loader2 } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/projects/new")({
+export const Route = createFileRoute("/_app/projects/new")({
   component: NewProject,
 });
 

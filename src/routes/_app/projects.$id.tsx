@@ -9,7 +9,7 @@ import { Lock, Circle, CheckCircle2, Clock, XCircle, AlertTriangle, ChevronLeft,
 
 import { format } from "date-fns";
 
-export const Route = createFileRoute("/_authenticated/projects/$id")({
+export const Route = createFileRoute("/_app/projects/$id")({
   component: ProjectPage,
 });
 

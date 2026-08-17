@@ -6,7 +6,7 @@ import { getMe } from "@/lib/projects.functions";
 import { ArrowRight, Clock, Flag, Sparkles, CheckCircle2, GitPullRequest } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 
-export const Route = createFileRoute("/_authenticated/dashboard")({
+export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
 });
 
