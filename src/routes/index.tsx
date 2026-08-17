@@ -20,7 +20,7 @@ function Landing() {
           </div>
           <span className="font-serif text-lg">Agency OS</span>
         </div>
-        <Link to="/auth" className="text-sm text-muted-foreground hover:text-foreground">Sign in</Link>
+        <Link to="/dashboard" className="text-sm text-muted-foreground hover:text-foreground">Open workspace</Link>
       </header>
 
       <section className="mx-auto max-w-4xl px-6 pb-24 pt-16 text-center">
@@ -36,7 +36,7 @@ function Landing() {
           AI coaching, and quality checks the whole team already trusts.
         </p>
         <div className="mt-10 flex items-center justify-center gap-3">
-          <Link to="/auth"
+          <Link to="/dashboard"
             className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-3 text-sm font-medium text-primary-foreground transition hover:opacity-90">
             Get started <ArrowRight className="h-4 w-4" />
           </Link>

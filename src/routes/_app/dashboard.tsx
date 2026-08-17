@@ -1,8 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { getMe } from "@/lib/projects.functions";
+import { useViewRole } from "@/lib/use-role";
 import { ArrowRight, Clock, Flag, Sparkles, CheckCircle2, GitPullRequest } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 
@@ -20,9 +19,7 @@ type Stage = { id: string; project_id: string; title: string; stage_order: numbe
 type Review = { id: string; comment: string | null; action: string; created_at: string; stage_id: string };
 
 function Dashboard() {
-  const fetchMe = useServerFn(getMe);
-  const meQ = useQuery({ queryKey: ["me"], queryFn: () => fetchMe() });
-  const me = meQ.data;
+  const { isDirector } = useViewRole();
 
   const projectsQ = useQuery({
     queryKey: ["projects"],
@@ -58,7 +55,6 @@ function Dashboard() {
     },
   });
 
-  const isDirector = me?.roles.includes("director") ?? false;
   const projects = projectsQ.data ?? [];
   const activeProjects = projects.filter((p) => p.status === "active");
   const completed = projects.filter((p) => p.status === "completed").length;
@@ -66,7 +62,7 @@ function Dashboard() {
   const inReview = stages.filter((s) => s.status === "in_review");
   const myActive = stages.filter((s) => {
     const p = projects.find((pp) => pp.id === s.project_id);
-    return s.status === "active" && p && (p.assigned_to === me?.userId || p.created_by === me?.userId);
+    return s.status === "active" && Boolean(p);
   });
 
   return (
@@ -75,7 +71,7 @@ function Dashboard() {
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Dashboard</div>
           <h1 className="mt-1 font-serif text-4xl">
-            Hello, {me?.profile?.display_name ?? "creative"}.
+            Hello, creative.
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {isDirector ? "You're leading the studio." : "Here's what needs your craft today."}
