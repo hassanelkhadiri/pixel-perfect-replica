@@ -1,36 +1,14 @@
-import { createFileRoute, redirect, Outlet, Link, useRouter, useLocation } from "@tanstack/react-router";
-import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, FolderPlus, Sparkles, LogOut } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { getMe } from "@/lib/projects.functions";
+import { createFileRoute, Outlet, Link, useLocation } from "@tanstack/react-router";
+import { LayoutDashboard, FolderPlus, Sparkles } from "lucide-react";
+import { useViewRole } from "@/lib/use-role";
 
 export const Route = createFileRoute("/_app")({
-  ssr: false,
-  beforeLoad: async () => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) throw redirect({ to: "/auth" });
-    return { user: data.user };
-  },
-  component: AuthLayout,
+  component: AppLayout,
 });
 
-function AuthLayout() {
-  const router = useRouter();
+function AppLayout() {
   const location = useLocation();
-  const queryClient = useQueryClient();
-  const fetchMe = useServerFn(getMe);
-  const { data: me } = useQuery({ queryKey: ["me"], queryFn: () => fetchMe() });
-
-  const roles = me?.roles ?? [];
-  const isDirector = roles.includes("director");
-
-  async function signOut() {
-    await queryClient.cancelQueries();
-    queryClient.clear();
-    await supabase.auth.signOut();
-    router.navigate({ to: "/auth", replace: true });
-  }
+  const { role, setRole, isDirector } = useViewRole();
 
   const navItems = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -67,15 +45,20 @@ function AuthLayout() {
             })}
           </nav>
           <div className="mt-auto flex flex-col gap-2 border-t border-border pt-4">
-            <div className="px-2">
-              <div className="text-sm font-medium">{me?.profile?.display_name ?? "You"}</div>
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                {roles.join(" · ") || "member"}
-              </div>
+            <div className="px-2 text-[10px] uppercase tracking-widest text-muted-foreground">View as</div>
+            <div className="flex gap-1 rounded-md bg-secondary/50 p-1">
+              {(["director", "creative"] as const).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRole(r)}
+                  className={`flex-1 rounded px-2 py-1.5 text-xs capitalize transition-colors ${
+                    role === r ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
             </div>
-            <button onClick={signOut} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary/60 hover:text-foreground">
-              <LogOut className="h-4 w-4" /> Sign out
-            </button>
           </div>
         </aside>
         <main className="min-h-screen w-full lg:pl-60">
